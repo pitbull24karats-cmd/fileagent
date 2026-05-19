@@ -16,13 +16,18 @@ app.include_router(codegen.router)
 async def health():
     status = {"server": "ok", "ollama": "unreachable", "ssh": "unchecked"}
 
-    try:
-        async with httpx.AsyncClient(timeout=5) as client:
-            resp = await client.get(f"{OLLAMA_URL}/api/tags")
-            if resp.status_code == 200:
-                status["ollama"] = "ok"
-    except Exception as e:
-        status["ollama"] = f"error: {e}"
+    from config import OLLAMA_FALLBACK_URL
+    for url, label in [(OLLAMA_URL, "windows"), (OLLAMA_FALLBACK_URL, "local")]:
+        try:
+            async with httpx.AsyncClient(timeout=5) as client:
+                resp = await client.get(f"{url}/api/tags")
+                if resp.status_code == 200:
+                    status["ollama"] = f"ok ({label})"
+                    break
+        except Exception:
+            continue
+    else:
+        status["ollama"] = "unreachable"
 
     try:
         import paramiko
